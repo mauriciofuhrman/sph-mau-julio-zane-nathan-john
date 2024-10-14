@@ -85,7 +85,19 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h){
 
     return count;
 }
-void hash_particles(sim_state_t* s, float h);
+void hash_particles(sim_state_t* s, float h)
+{
+    for (int i = 0; i < HASH_SIZE; i++) {
+        s->hash[i] = nullptr;
+    }
+
+    for (int i = 0; i < s->n; i++) {
+        particle_t* p = &(s->part[i]);
+        unsigned bucket = particle_bucket(p, h);
+        p->next = s->hash[bucket];
+        s->hash[bucket] = p;
+    }
+}
 
 /*@q*/
 #endif /* BINHASH_H */
