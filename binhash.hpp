@@ -1,6 +1,7 @@
 #ifndef BINHASH_H
 #define BINHASH_H
 
+#include "zmorton.hpp"
 #include "state.hpp"
 
 /*@T
@@ -42,8 +43,15 @@
 #define HASH_DIM 0x10
 #define HASH_SIZE (HASH_DIM*HASH_DIM*HASH_DIM)
 #define MAX_NBR_BINS 27
+#define HASH_MASK (HASH_DIM-1)
 
-unsigned particle_bucket(particle_t* p, float h);
+unsigned particle_bucket(particle_t* p, float h) {
+  unsigned ix = static_cast<unsigned>(p->x[0] / h);
+  unsigned iy = static_cast<unsigned>(p->x[1] / h);
+  unsigned iz = static_cast<unsigned>(p->x[2] / h);
+
+  return zm_encode(ix & HASH_MASK, iy & HASH_MASK, iz & HASH_MASK);
+}
 unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h);
 void hash_particles(sim_state_t* s, float h);
 
