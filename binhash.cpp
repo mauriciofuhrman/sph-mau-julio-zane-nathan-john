@@ -31,11 +31,50 @@ unsigned particle_bucket(particle_t* p, float h)
 unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
 {
     /* BEGIN TASK */
+    unsigned count = 0;
+
+    int ix = static_cast<int>(p->x[0] / h);
+    int iy = static_cast<int>(p->x[1] / h);
+    int iz = static_cast<int>(p->x[2] / h);
+
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                unsigned bx = (ix + dx) & HASH_MASK;
+                unsigned by = (iy + dy) & HASH_MASK;
+                unsigned bz = (iz + dz) & HASH_MASK;
+                
+                unsigned bucket = zm_encode(bx, by, bz);
+                
+                bool found = false;
+                for (unsigned i = 0; i < count; i++) {
+                    if (buckets[i] == bucket) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (!found && count < MAX_NBR_BINS) {
+                    buckets[count++] = bucket;
+                }
+            }
+        }
+    }
+
+    return count;
     /* END TASK */
 }
 
 void hash_particles(sim_state_t* s, float h)
 {
-    /* BEGIN TASK */
-    /* END TASK */
+    for (int i = 0; i < HASH_SIZE; i++) {
+        s->hash[i] = nullptr;
+    }
+
+    for (int i = 0; i < s->n; i++) {
+        particle_t* p = &(s->part[i]);
+        unsigned bucket = particle_bucket(p, h);
+        p->next = s->hash[bucket];
+        s->hash[bucket] = p;
+    }
 }
