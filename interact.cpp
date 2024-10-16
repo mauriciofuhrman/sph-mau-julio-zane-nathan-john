@@ -57,6 +57,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
 #ifdef USE_PARALLEL
+    // #pragma omp parallel for schedule(dynamic) could be worth experimenting with
     #pragma omp parallel for
     for (int i = 0; i < n; ++i) {
         unsigned buckets[MAX_NBR_BINS];
@@ -69,6 +70,10 @@ void compute_density(sim_state_t* s, sim_param_t* params)
                 if (pi != pj) {
                     // unrolled update desnity to avoid updating both pi and pj
                     float r2 = vec3_dist2(pi->x, pj->x);
+                    // if (r2 >= h2) { experiment if this speeds up
+                    //     continue;
+                    // }
+
                     float z = h2 - r2;
                     if (z > 0) {
                         float rho_ij = C * z * z * z;
