@@ -10,3 +10,4 @@ sph_*.err
 
 # run
 run.out
+.vscode/settings.json

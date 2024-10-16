@@ -13,7 +13,10 @@
 #include "binhash.hpp"
 
 /* Define this to use the bucketing version of the code */
-#define USE_BUCKETING
+// #define USE_BUCKETING
+
+/* Define to use the parallel version of the code*/
+#define USE_PARALLEL
 
 /*@T
  * \subsection{Density computations}
@@ -53,6 +56,31 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float h9 = h3*h3*h3;
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
+#ifdef USE_PARALLEL
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        unsigned buckets[MAX_NBR_BINS];
+        particle_t* pi = &p[i];
+        pi->rho = (315.0/64.0/M_PI) * s->mass / h3;
+        unsigned num_buckets = particle_neighborhood(buckets, pi, h);
+        for (unsigned b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            while (pj) {
+                if (pi != pj) {
+                    // unrolled update desnity to avoid updating both pi and pj
+                    float r2 = vec3_dist2(pi->x, pj->x);
+                    float z = h2 - r2;
+                    if (z > 0) {
+                        float rho_ij = C * z * z * z;
+                        pi->rho += rho_ij;
+                    }
+                }
+                pj = pj->next;
+            }
+        }
+    }
+#else
+
     // Clear densities
     for (int i = 0; i < n; ++i)
         p[i].rho = 0;
@@ -89,6 +117,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
         }
     }
 #endif
+#endif
 }
 
 
@@ -107,6 +136,36 @@ void compute_density(sim_state_t* s, sim_param_t* params)
  * but it does a very expensive brute force search for neighbors.
  *@c*/
 
+#ifdef USE_PARALLEL
+inline
+void update_forces(particle_t* pi, particle_t* pj, float h2,
+                   float rho0, float C0, float Cp, float Cv)
+{
+    float dx[3];
+    vec3_diff(dx, pi->x, pj->x);
+    float r2 = vec3_len2(dx);
+    if (r2 < h2) {
+        const float rhoi = pi->rho;
+        const float rhoj = pj->rho;
+        float q = sqrt(r2/h2);
+        float u = 1-q;
+        float w0 = C0 * u/rhoi/rhoj;
+        float wp = w0 * Cp * (rhoi+rhoj-2*rho0) * u/q;
+        float wv = w0 * Cv;
+        float dv[3];
+        vec3_diff(dv, pi->v, pj->v);
+
+        // only want to compute forces acting on pi, to prevent concurrent writes to shared data
+        // Equal and opposite pressure forces
+        vec3_saxpy(pi->a,  wp, dx);
+        // vec3_saxpy(pj->a, -wp, dx);
+        
+        // // Equal and opposite viscosity forces
+        vec3_saxpy(pi->a,  wv, dv);
+        // vec3_saxpy(pj->a, -wv, dv);
+    }
+}
+#else
 inline
 void update_forces(particle_t* pi, particle_t* pj, float h2,
                    float rho0, float C0, float Cp, float Cv)
@@ -134,6 +193,7 @@ void update_forces(particle_t* pi, particle_t* pj, float h2,
         vec3_saxpy(pj->a, -wv, dv);
     }
 }
+#endif
 
 void compute_accel(sim_state_t* state, sim_param_t* params)
 {
@@ -157,15 +217,39 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     // Compute density and color
     compute_density(state, params);
 
+#ifdef USE_PARALLEL
+    // Start with gravity and surface forces
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i)
+        vec3_set(p[i].a, 0, -g, 0);
+#else
     // Start with gravity and surface forces
     for (int i = 0; i < n; ++i)
         vec3_set(p[i].a,  0, -g, 0);
-
+#endif
     // Constants for interaction term
     float C0 = 45 * mass / M_PI / ( (h2)*(h2)*h );
     float Cp = k/2;
     float Cv = -mu;
 
+#ifdef USE_PARALLEL
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        unsigned buckets[MAX_NBR_BINS]; //private variable for thread moved inside
+        particle_t* pi = &p[i];
+        unsigned num_buckets = particle_neighborhood(buckets, pi, h);
+
+        for (unsigned b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            while (pj) {
+                if (pi != pj) {
+                    update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
+                }
+                pj = pj->next;
+            }
+        }
+    }
+#else
     // Accumulate forces
 #ifdef USE_BUCKETING
     /* BEGIN TASK */
@@ -193,6 +277,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
             update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
         }
     }
+#endif
 #endif
 }
 
