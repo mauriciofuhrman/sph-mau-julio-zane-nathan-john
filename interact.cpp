@@ -13,7 +13,7 @@
 #include "binhash.hpp"
 
 /* Define this to use the bucketing version of the code */
-// #define USE_BUCKETING
+#define USE_BUCKETING
 
 /* Define to use the parallel version of the code*/
 #define USE_PARALLEL

@@ -172,6 +172,7 @@ int main(int argc, char** argv)
         write_frame_data(fp, n, state, NULL);
     }
     double t_end = omp_get_wtime();
+    printf("Ran with %d particles\n", state->n);
     printf("Ran in %g seconds\n", t_end-t_start);
 
     fclose(fp);

@@ -2,6 +2,8 @@
 
 #include "zmorton.hpp"
 #include "binhash.hpp"
+#include <cstdlib>
+
 
 /*@q
  * ====================================================================
@@ -19,7 +21,7 @@
  *@c*/
 
 #define HASH_MASK (HASH_DIM-1)
-// #define USE_PARALLEL
+#define USE_PARALLEL
 
 unsigned particle_bucket(particle_t* p, float h)
 {
@@ -71,7 +73,6 @@ void hash_particles(sim_state_t* s, float h)
     /* BEGIN TASK */
     
 #ifdef USE_PARALLEL
-#pragma omp parallel for
     #pragma omp parallel for
     for (int i = 0; i < HASH_SIZE; i++) {
         s->hash[i] = nullptr;
