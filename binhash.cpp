@@ -21,7 +21,7 @@
  *@c*/
 
 #define HASH_MASK (HASH_DIM-1)
-#define USE_PARALLEL
+// #define USE_PARALLEL
 
 unsigned particle_bucket(particle_t* p, float h)
 {

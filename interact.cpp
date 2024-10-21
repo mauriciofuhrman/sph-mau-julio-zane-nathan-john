@@ -16,7 +16,7 @@
 #define USE_BUCKETING
 
 /* Define to use the parallel version of the code*/
-#define USE_PARALLEL
+// #define USE_PARALLEL
 
 /*@T
  * \subsection{Density computations}
