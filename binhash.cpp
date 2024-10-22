@@ -21,7 +21,6 @@
  *@c*/
 
 #define HASH_MASK (HASH_DIM-1)
-// #define USE_PARALLEL
 
 unsigned particle_bucket(particle_t* p, float h)
 {
@@ -71,45 +70,6 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
 void hash_particles(sim_state_t* s, float h)
 {
     /* BEGIN TASK */
-    
-#ifdef USE_PARALLEL
-    #pragma omp parallel for
-    for (int i = 0; i < HASH_SIZE; i++) {
-        s->hash[i] = nullptr;
-    }
-
-    int n = s->n;
-
-    #pragma omp parallel
-    {
-        particle_t** local_hash = (particle_t**) calloc(HASH_SIZE, sizeof(particle_t*));
-
-        #pragma omp for
-        for (int i = 0; i < n; ++i) {
-            particle_t* p = &(s->part[i]);
-            unsigned bucket = particle_bucket(p, h);
-
-            p->next = local_hash[bucket];
-            local_hash[bucket] = p;
-        }
-
-        #pragma omp critical
-        {
-            for (int i = 0; i < HASH_SIZE; ++i) {
-                if (local_hash[i] != nullptr) {
-                    particle_t* p = local_hash[i];
-                    while (p) {
-                        particle_t* next_p = p->next;
-                        p->next = s->hash[i];
-                        s->hash[i] = p;
-                        p = next_p;
-                    }
-                }
-            }
-        }
-        free(local_hash);
-    }
-#else
     for (int i = 0; i < HASH_SIZE; i++) {
         s->hash[i] = nullptr;
     }
@@ -119,6 +79,5 @@ void hash_particles(sim_state_t* s, float h)
         p->next = s->hash[bucket];
         s->hash[bucket] = p;
     }
-#endif
     /* END TASK */
 }
