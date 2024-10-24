@@ -64,32 +64,48 @@ void compute_density(sim_state_t* s, sim_param_t* params)
         p[i].rho = (315.0/64.0/M_PI) * s->mass / h3;
     }
 
-    // Now compute density contributions
     #pragma omp parallel for
     for (int i = 0; i < n; ++i) {
-        unsigned buckets[MAX_NBR_BINS];
         particle_t* pi = &p[i];
+        unsigned pi_bin = particle_bucket(pi, h); // pi bin index
+
+        unsigned buckets[MAX_NBR_BINS];
         unsigned num_buckets = particle_neighborhood(buckets, pi, h);
         
-        float local_rho = 0.0f;  // Thread-local accumulator
         
         for (unsigned b = 0; b < num_buckets; ++b) {
+            unsigned bj = buckets[b];
+            if (bj < pi_bin) // only process bins with bj >= pi_bin
+                continue;
+
             particle_t* pj = hash[buckets[b]];
             while (pj) {
-                if (pi != pj) {
-                    float r2 = vec3_dist2(pi->x, pj->x);
-                    float z = h2 - r2;
-                    if (z > 0) {
-                        local_rho += C * z * z * z;
-                    }
+                if (pi == pj) {
+                    pj = pj->next;
+                    continue;
                 }
+
+                int pi_index = pi - p;
+                int pj_index = pj - p;
+
+                // for particles in the same bin, only process pj if pj_index > pi_index
+                if (bj == pi_bin && pj_index <= pi_index) {
+                    pj = pj->next;
+                    continue;
+                }
+
+                float r2 = vec3_dist2(pi->x, pj->x);
+                float z  = h2 - r2;
+                if (z > 0) {
+                    float rho_ij = C * z * z * z;
+                    pi->rho += rho_ij;
+                    #pragma omp atomic
+                    pj->rho += rho_ij;
+                }
+
                 pj = pj->next;
             }
         }
-        
-        // Single atomic update per particle
-        #pragma omp atomic
-        pi->rho += local_rho;
     }
 #else
     // Clear densities
